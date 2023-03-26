@@ -132,7 +132,7 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--name', type=str, required=True,
-                        help='Target process name')
+                        help='Target process name (case insensitive)')
     parser.add_argument('-i', '--interval', type=float, default=1.0,
                         help='Collection interval (sec)')
     parser.add_argument('-d', '--duration', type=float, default=1.0,
