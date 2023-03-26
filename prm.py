@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
+from subprocess import Popen, PIPE
 import sys
 import threading
 import time
@@ -20,7 +20,7 @@ class Usage:
     name: str
     cpu_percent: float
     average_cpu_percent: float
-    mem_usage: float
+    mem_usage: str
 
     def to_str(self, delim: str = ','):
         return delim.join(str(elem) for elem in [
@@ -29,7 +29,7 @@ class Usage:
             self.name,
             round(self.cpu_percent, 2),
             round(self.average_cpu_percent, 2),
-            round(self.mem_usage, 2),
+            self.mem_usage,
         ])
 
 
@@ -52,6 +52,7 @@ class Collector:
         self.proc: psutil.Process = None
         # create (overwrite)
         with self.output_path.open('w') as stream:
+            # pylint:disable=no-member
             line = ','.join(Usage.__dataclass_fields__.keys())
             stream.write(line + '\n')
             self._stdout(line)
@@ -95,9 +96,9 @@ class Collector:
         cpu_percent = self.proc.cpu_percent(interval=self.cpu_window_size)
         average_cpu_percent = cpu_percent / psutil.cpu_count()
         if sys.platform == 'win32':
-            mem_usage = self._get_mem_usage_windows() / 1024. / 1024.
+            mem_usage = self._get_mem_usage_windows()
         else:
-            mem_usage = self.proc.memory_info().private / 1024. / 1024.
+            mem_usage = self._get_mem_usage_unix()
         with self.output_path.open('a') as stream:
             usage = Usage(
                 stamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -110,15 +111,22 @@ class Collector:
             stream.write(line + '\n')
             self._stdout(line)
 
+    def _get_mem_usage_unix(self):
+        args = f'top -l 1 -pid {self.proc.pid} -stats mem -o MEM | tail -1'
+        with Popen(['bash', '-lc', args], stdout=PIPE) as process:
+            p_out, _ = process.communicate()
+        return p_out.decode().strip()
+
     def _get_mem_usage_windows(self):
+        # pylint:disable=anomalous-backslash-in-string
         cmd = '(Get-Counter -Counter ' \
             '"\Process(' \
             f'$((Get-Process -Id {self.proc.pid}).Name)' \
             ')\Working Set - Private"' \
             ').CounterSamples.CookedValue'
-        p = subprocess.Popen(['powershell.exe', cmd], stdout=subprocess.PIPE)
-        p_out, p_err = p.communicate()
-        return int(p_out)
+        with Popen(['powershell.exe', cmd], stdout=PIPE) as process:
+            p_out, _ = process.communicate()
+        return f'{int(p_out) / 1024 / 1024}M'
 
 
 def main():
