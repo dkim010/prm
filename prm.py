@@ -53,9 +53,8 @@ class Collector:
         # create (overwrite)
         with self.output_path.open('w') as stream:
             # pylint:disable=no-member
-            line = ','.join(Usage.__dataclass_fields__.keys())
-            stream.write(line + '\n')
-            self._stdout(line)
+            stream.write(','.join(Usage.__dataclass_fields__.keys()) + '\n')
+            self._stdout(', '.join(Usage.__dataclass_fields__.keys()))
 
     def _stdout(self, *lines: str):
         if not self.silent:
@@ -107,9 +106,8 @@ class Collector:
                 cpu_percent=cpu_percent,
                 average_cpu_percent=average_cpu_percent,
                 mem_usage=mem_usage)
-            line = usage.to_str()
-            stream.write(line + '\n')
-            self._stdout(line)
+            stream.write(usage.to_str()+ '\n')
+            self._stdout(usage.to_str(', '))
 
     def _get_mem_usage_unix(self):
         args = f'top -l 1 -pid {self.proc.pid} -stats mem -o MEM | tail -1'
