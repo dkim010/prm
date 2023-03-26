@@ -1,16 +1,16 @@
 from __future__ import annotations
+
 import argparse
-from datetime import datetime
-from dataclasses import dataclass
 import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from pprint import pprint
 
 import psutil
-
 
 
 @dataclass
@@ -30,7 +30,7 @@ class Usage:
             round(self.cpu_percent, 2),
             round(self.average_cpu_percent, 2),
             round(self.mem_usage, 2),
-            ])
+        ])
 
 
 class Collector:
@@ -66,7 +66,7 @@ class Collector:
             start_time = time.time()
             for i in range(int(self.duration / self.interval + 1)):
                 # cleanup
-                for j in range(len(self.timers)-1,-1,-1):
+                for j in range(len(self.timers) - 1, -1, -1):
                     if not self.timers[j].is_alive():
                         self.timers.pop(j)
                 # add new timer
@@ -100,12 +100,12 @@ class Collector:
             mem_usage = self.proc.memory_info().private / 1024. / 1024.
         with self.output_path.open('a') as stream:
             usage = Usage(
-                    stamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    pid=self.proc.pid,
-                    name=self.proc.name(),
-                    cpu_percent=cpu_percent,
-                    average_cpu_percent=average_cpu_percent,
-                    mem_usage=mem_usage)
+                stamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                pid=self.proc.pid,
+                name=self.proc.name(),
+                cpu_percent=cpu_percent,
+                average_cpu_percent=average_cpu_percent,
+                mem_usage=mem_usage)
             line = usage.to_str()
             stream.write(line + '\n')
             self._stdout(line)
@@ -124,7 +124,7 @@ class Collector:
 def main():
     default_output_path = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
     parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--name', type=str, required=True,
                         help='Target process name')
     parser.add_argument('-i', '--interval', type=float, default=1.0,
