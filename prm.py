@@ -36,20 +36,32 @@ class Usage:
 class Collector:
     def __init__(self,
                  name: str,
+                 pid: int,
                  interval: float,
                  duration: float,
                  output_path: Path,
                  silent: bool):
-        self.name: str = f'{name.lower()}'
+        name = f'{name.lower()}'
         if sys.platform == 'win32':
-            self.name += '.exe'
+            name += '.exe'
         self.timers: list[threading.Timer] = []
         self.interval: float = interval
         self.duration: float = duration * 60
         self.cpu_window_size: float = 2.0  # unit: sec
         self.output_path: Path = output_path
         self.silent: bool = silent
-        self.proc: psutil.Process = None
+        # set proc
+        if name:
+            found_proc = None
+            for proc in psutil.process_iter(['pid', 'name']):
+                if proc.name().lower() == name:
+                    found_proc = proc
+                    break
+            if found_proc is None:
+                raise Exception(f'{name} process was not found')
+        else:
+            found_proc = psutil.Process(pid=pid)
+        self.proc: psutil.Process = found_proc
         # create (overwrite)
         with self.output_path.open('w') as stream:
             # pylint:disable=no-member
@@ -62,7 +74,6 @@ class Collector:
 
     def start(self):
         try:
-            self.proc = self._get_proc(self.name)
             start_time = time.time()
             for i in range(int(self.duration / self.interval + 1)):
                 # cleanup
@@ -79,17 +90,6 @@ class Collector:
             # cancel all timers
             for timer in self.timers:
                 timer.cancel()
-
-    @classmethod
-    def _get_proc(cls, name):
-        found_proc = None
-        for proc in psutil.process_iter(['pid', 'name']):
-            if proc.name().lower() == name:
-                found_proc = proc
-                break
-        if found_proc is None:
-            raise Exception(f'{name} process was not found')
-        return found_proc
 
     def collect_usage(self):
         cpu_percent = self.proc.cpu_percent(interval=self.cpu_window_size)
@@ -131,8 +131,12 @@ def main():
     default_output_path = f'{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-n', '--name', type=str, required=True,
-                        help='Target process name (case insensitive)')
+    parser.add_argument('-n', '--name', type=str, default='',
+                        help='Target process name (case insensitive)\n'
+                             '* name or pid is required *')
+    parser.add_argument('-p', '--pid', type=int, default=0,
+                        help='Target process id\n'
+                             '* name or pid is required *')
     parser.add_argument('-i', '--interval', type=float, default=1.0,
                         help='Collection interval (sec)')
     parser.add_argument('-d', '--duration', type=float, default=1.0,
@@ -143,6 +147,8 @@ def main():
     parser.add_argument('-s', '--silent', action='store_true', default=False,
                         help='No stdout')
     args = parser.parse_args()
+    if (not args.name and not args.pid) or (args.name and args.pid):
+        parser.error('Just one of `--name` or `--pid` is required')
     pprint(args.__dict__)
     collector = Collector(**args.__dict__)
     collector.start()
