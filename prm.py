@@ -93,7 +93,7 @@ class Collector:
 
     def collect_usage(self):
         cpu_percent = self.proc.cpu_percent(interval=self.cpu_window_size)
-        average_cpu_percent = cpu_percent / psutil.cpu_count()
+        average_cpu_percent = cpu_percent / psutil.cpu_count(logical=False)
         if sys.platform == 'win32':
             mem_usage = self._get_mem_usage_windows()
         else:
