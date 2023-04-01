@@ -3,7 +3,7 @@
 - [psutil](https://psutil.readthedocs.io/en/latest/) and [pywin32](https://github.com/mhammond/pywin32) packages
   ```bash
   $ pip3 install psutil==5.9.4
-  $ pip3 install pywin32==306
+  $ pip3 install pywin32==306  # only in windows
   ```
   - Calculates a process's CPU utilization and memory usage in Windows by using pywin32.
     - CPU utilization is based on `(process time (kernel and user) / elapsed time)`.
