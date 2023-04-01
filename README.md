@@ -1,12 +1,17 @@
 # Prerequisite
 - Python 3
-- [psutil](https://psutil.readthedocs.io/en/latest/) package
+- [psutil](https://psutil.readthedocs.io/en/latest/) and [pywin32](https://github.com/mhammond/pywin32) packages
   ```bash
   $ pip3 install psutil==5.9.4
+  $ pip3 install pywin32==306
   ```
-  - Calculates a process's cpu utilization in Windows by using [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes)
+  - Calculates a process's CPU utilization and memory usage in Windows by using pywin32.
+    - CPU utilization is based on `(process time (kernel and user) / elapsed time)`.
+  - Calculates a process's cpu util. and memory usage in other operating systems by using psutil.
+
+<!--  - Calculates a process's cpu utilization in Windows by using [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes)
     - [refer](https://learn.microsoft.com/en-us/answers/questions/1000290/how-is-the-process-cpu-usage-in-task-manager-calcu)
-    - But, we can try other APIs (e.g., [Pdh Performance Counter](https://learn.microsoft.com/en-us/answers/questions/69560/msdn-forum-cpu-usage-caculated-by-windows-api-is-n)).
+    - But, we can try other APIs (e.g., [Pdh Performance Counter](https://learn.microsoft.com/en-us/answers/questions/69560/msdn-forum-cpu-usage-caculated-by-windows-api-is-n)).-->
 
 # How to use
 ```bash
