@@ -1,7 +1,7 @@
+# pylint:disable=unnecessary-lambda-assignment,import-error
 from __future__ import annotations
 
 import argparse
-from subprocess import Popen, PIPE
 import sys
 import threading
 import time
@@ -9,13 +9,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from pprint import pprint
+from subprocess import PIPE, Popen
 
 import psutil
-import win32api
-import win32con
-import win32process
-import win32pdh
-import win32pdhutil
+
+if sys.platform == 'win32':
+    import win32api
+    import win32con
+    import win32pdh
+    import win32process
 
 
 @dataclass
@@ -47,8 +49,9 @@ class Collector:
                  output_path: Path,
                  silent: bool):
         name = f'{name.lower()}'
-        naming = lambda name: name[:-4] if name[-4:].lower() == '.exe' \
-                 else name
+
+        def naming(name):
+            return name[:-4] if name[-4:].lower() == '.exe' else name
         self.timers: list[threading.Timer] = []
         self.interval: float = interval
         self.duration: float = duration * 60
@@ -70,7 +73,7 @@ class Collector:
         self.proc: psutil.Process = found_proc
         # set win32
         if sys.platform == 'win32':
-            self.win32_cpu_handle = win32api.OpenProcess(\
+            self.win32_cpu_handle = win32api.OpenProcess(
                 win32con.PROCESS_ALL_ACCESS, False, self.proc.pid)
             self.win32_times = (
                 time.time(),
@@ -131,7 +134,7 @@ class Collector:
                 cpu_percent=cpu_percent,
                 average_cpu_percent=average_cpu_percent,
                 mem_usage=mem_usage)
-            stream.write(usage.to_str()+ '\n')
+            stream.write(usage.to_str() + '\n')
             self._stdout(usage.to_str(', '))
 
     def _get_mem_usage_unix(self):
@@ -145,7 +148,7 @@ class Collector:
                  win32process.GetProcessTimes(self.win32_cpu_handle))
         before = self.win32_times
         cpu_percent = \
-            ((after[1]['KernelTime'] - before[1]['KernelTime']) \
+            ((after[1]['KernelTime'] - before[1]['KernelTime'])
              + (after[1]['UserTime'] - before[1]['UserTime'])) \
             / 10000000 / (after[0] - before[0]) * 100
         self.win32_times = after
