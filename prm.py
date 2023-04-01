@@ -11,6 +11,11 @@ from pathlib import Path
 from pprint import pprint
 
 import psutil
+import win32api
+import win32con
+import win32process
+import win32pdh
+import win32pdhutil
 
 
 @dataclass
@@ -42,8 +47,8 @@ class Collector:
                  output_path: Path,
                  silent: bool):
         name = f'{name.lower()}'
-        if sys.platform == 'win32':
-            name += '.exe'
+        naming = lambda name: name[:-4] if name[-4:].lower() == '.exe' \
+                 else name
         self.timers: list[threading.Timer] = []
         self.interval: float = interval
         self.duration: float = duration * 60
@@ -54,7 +59,8 @@ class Collector:
         if name:
             found_proc = None
             for proc in psutil.process_iter(['pid', 'name']):
-                if proc.name().lower() == name:
+                proc_name = naming(proc.name().lower())
+                if proc_name == name:
                     found_proc = proc
                     break
             if found_proc is None:
@@ -62,6 +68,21 @@ class Collector:
         else:
             found_proc = psutil.Process(pid=pid)
         self.proc: psutil.Process = found_proc
+        # set win32
+        if sys.platform == 'win32':
+            self.win32_cpu_handle = win32api.OpenProcess(\
+                win32con.PROCESS_ALL_ACCESS, False, self.proc.pid)
+            self.win32_times = (
+                time.time(),
+                win32process.GetProcessTimes(self.win32_cpu_handle))
+            win32_mem_path = \
+                f'\\Process({naming(self.proc.name())})\\Working Set - Private'
+            self.win32_mem_query = win32pdh.OpenQuery()
+            self.win32_mem_handle = win32pdh.AddCounter(
+                self.win32_mem_query, win32_mem_path)
+        else:
+            self.win32_cpu_handle = None
+            self.win32_times = None
         # create (overwrite)
         with self.output_path.open('w') as stream:
             # pylint:disable=no-member
@@ -92,12 +113,16 @@ class Collector:
                 timer.cancel()
 
     def collect_usage(self):
-        cpu_percent = self.proc.cpu_percent(interval=self.cpu_window_size)
-        average_cpu_percent = cpu_percent / psutil.cpu_count(logical=False)
+        # cpu & memory
         if sys.platform == 'win32':
-            mem_usage = self._get_mem_usage_windows()
+            cpu_percent = self._get_cpu_usage_win32()
+            average_cpu_percent = cpu_percent / psutil.cpu_count(logical=True)
+            mem_usage = self._get_mem_usage_win32()
         else:
+            cpu_percent = self.proc.cpu_percent(interval=self.cpu_window_size)
+            average_cpu_percent = cpu_percent / psutil.cpu_count(logical=False)
             mem_usage = self._get_mem_usage_unix()
+        # logging
         with self.output_path.open('a') as stream:
             usage = Usage(
                 stamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -115,16 +140,22 @@ class Collector:
             p_out, _ = process.communicate()
         return p_out.decode().strip()
 
-    def _get_mem_usage_windows(self):
-        # pylint:disable=anomalous-backslash-in-string
-        cmd = '(Get-Counter -Counter ' \
-            '"\Process(' \
-            f'$((Get-Process -Id {self.proc.pid}).Name)' \
-            ')\Working Set - Private"' \
-            ').CounterSamples.CookedValue'
-        with Popen(['powershell.exe', cmd], stdout=PIPE) as process:
-            p_out, _ = process.communicate()
-        return f'{int(p_out) / 1024 / 1024}M'
+    def _get_cpu_usage_win32(self):
+        after = (time.time(),
+                 win32process.GetProcessTimes(self.win32_cpu_handle))
+        before = self.win32_times
+        cpu_percent = \
+            ((after[1]['KernelTime'] - before[1]['KernelTime']) \
+             + (after[1]['UserTime'] - before[1]['UserTime'])) \
+            / 10000000 / (after[0] - before[0]) * 100
+        self.win32_times = after
+        return cpu_percent
+
+    def _get_mem_usage_win32(self):
+        win32pdh.CollectQueryData(self.win32_mem_query)
+        mem_usage = win32pdh.GetFormattedCounterValue(
+            self.win32_mem_handle, win32pdh.PDH_FMT_DOUBLE)[1]
+        return f'{round(mem_usage / 1024 / 1024, 2)}M'
 
 
 def main():
