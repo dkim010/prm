@@ -31,7 +31,6 @@ class Ingester:
             mysql_user: str,
             mysql_database: str,
             mysql_table: str,
-            timezone_hours: int,
     ):
         self.log_file = log_file
         self.version = version
@@ -44,7 +43,6 @@ class Ingester:
         self.mysql_database = mysql_database
         self.mysql_table = mysql_table
         self.uri = f'mysql+pymysql://{mysql_user}@{mysql_host}:{mysql_port}/{mysql_database}'
-        self.timezone_hours = timezone_hours
 
     def _generate_dataframe(self) -> pl.DataFrame:
         df = pl.read_csv(self.log_file)
@@ -61,7 +59,7 @@ class Ingester:
             pl.col('average_cpu_percent'),
             pl.col('mem_usage').map_elements(string_to_bytes, pl.Int64).alias('mem_usage'),
         )
-        min_time = df['time'].min() + self.timezone_hours * 3600 * 1000 # UTC+9
+        min_time = df['time'].min()
         df = df.with_columns(pl.col('time') - min_time)
         return df
 
@@ -106,7 +104,6 @@ def main():
     parser.add_argument('-u', '--mysql_user', type=str, default='root')
     parser.add_argument('-d', '--mysql_database', type=str, default='log_db')
     parser.add_argument('-t', '--mysql_table', type=str, default='log_table')
-    parser.add_argument('-z', '--timezone_hours', type=int, default=9)
 
     args = parser.parse_args()
     pprint(args.__dict__)
